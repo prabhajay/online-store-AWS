@@ -1,0 +1,78 @@
+type Book
+  @model
+  @auth(
+    rules: [
+      { allow: groups, groups: ["Admin"], operations: [create, update, delete] }
+      { allow: private, operations: [read] }
+      { allow: public, operations: [read] }
+    ]
+  ) {
+  id: ID!
+  title: String!
+  description: String
+  image: String
+  author: String
+  featured: Boolean
+  price: Float
+  orders: [BookOrder] @hasMany(indexName: "byBook", fields: ["id"])
+}
+
+type BookOrder
+  @model
+  @key(fields: ["book_id", "order_id"])
+  @key(fields: ["order_id", "book_id"])
+  @auth(
+    rules: [
+      { allow: owner, identityClaim: "email", ownerField: "customer" }
+      { allow: groups, groups: ["Admin"] }
+    ]
+  ) {
+  id: ID!
+  book_id: ID!
+  order_id: ID!
+  book: Book @belongsTo(fields: ["book_id"])
+  order: Order @belongsTo(fields: ["order_id"])
+}
+
+type Order
+  @model
+  @key(fields: ["user"])
+  @auth(
+    rules: [
+      { allow: owner, identityClaim: "email", ownerField: "user" }
+      { allow: groups, groups: ["Admin"], operations: [read] }
+    ]
+  ) {
+  id: ID!
+  user: String!
+  date: String
+  total: Float
+  books: [BookOrder] @hasMany(indexName: "byOrder", fields: ["id"])
+}
+
+enum OrderStatus {
+  SUCCESS
+  FAILED
+}
+
+input CartItem {
+  id: ID!
+  title: String
+  image: String
+  price: Float
+  amount: Int
+}
+
+input ProcessOrderInput {
+  id: ID!
+  cart: [CartItem]
+  total: Float!
+  token: String!
+  address: String
+}
+
+type Mutation {
+  processOrder(input: ProcessOrderInput!): OrderStatus
+    @function(name: "processPayment-${env}")
+    @function(name: "createOrder-${env}")
+}
